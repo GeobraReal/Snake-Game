@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Snake Game</title>
+    <style>
+        /* CSS переменные для Светлой и Темной тем */
+        :root {
+            --bg-body: #f0f2f5;
+            --bg-game: #ffffff;
+            --text-color: #333333;
+            --snake-head: #2E7D32; 
+            --snake-body: #4CAF50; 
+            --apple: #e53935;     
+            --btn-bg: #e0e0e0;
+            --btn-hover: #cfcfcf;
+            --overlay: rgba(255, 255, 255, 0.9);
+            --shadow: rgba(0, 0, 0, 0.1);
+            --border-radius: 12px;
+        }
+
+        /* ТЕМНАЯ ТЕМА */
+        [data-theme="dark"] {
+            --bg-body: #18191a;
+            --bg-game: #242526;
+            --text-color: #e4e6eb; 
+            --snake-head: #43A047; 
+            --snake-body: #66BB6A;
+            --apple: #ef5350;
+            --btn-bg: #3a3b3c;
+            --btn-hover: #4e4f50;
+            --overlay: rgba(36, 37, 38, 0.9);
+            --shadow: rgba(0, 0, 0, 0.5);
+        }
+
+        body {
+            background-color: var(--bg-body);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        #game-container {
+            position: relative;
+            background-color: var(--bg-game);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 10px 30px var(--shadow);
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        /* Кнопка настроек с SVG иконкой шестеренки */
+        #settings-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-color);
+            transition: transform 0.3s ease;
+        }
+
+        #settings-btn:hover { transform: rotate(45deg); }
+
+        /* Класс для UI иконок */
+        .ui-svg {
+            width: 24px;
+            height: 24px;
+            fill: currentColor;
+        }
+
+        canvas {
+            background-color: var(--bg-body);
+            border-radius: 8px;
+            display: block;
+            box-shadow: inset 0 2px 5px var(--shadow);
+            outline: none;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: var(--overlay);
+            border-radius: var(--border-radius);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s ease, visibility 0.3s;
+            z-index: 10;
+        }
+
+        .overlay.active { visibility: visible; opacity: 1; }
+
+        h2 { margin-top: 0; text-align: center; }
+
+        button.ui-btn {
+            background-color: var(--btn-bg);
+            color: var(--text-color);
+            border: none;
+            padding: 12px 16px;
+            margin: 8px 0;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            width: 240px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: background-color 0.2s ease, transform 0.1s;
+        }
+
+        button.ui-btn:hover { background-color: var(--btn-hover); }
+        button.ui-btn:active { transform: scale(0.97); }
+
+        /* Убрана ошибка съехавшего текста */
+        .primary-btn {
+            background-color: var(--snake-body) !important;
+            color: white !important;
+            font-weight: bold;
+            margin-top: 15px;
+            justify-content: center !important; /* Ровно по центру */
+            text-align: center;
+        }
+        .primary-btn:hover { background-color: var(--snake-head) !important; }
+
+        /* Класс для векторных флагов */
+        .svg-icon {
+            width: 24px;
+            height: 16px;
+            border-radius: 2px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            display: inline-block;
+        }
+    </style>
+</head>
+<body data-theme="dark">
+
+<div id="game-container">
+    <header>
+        <div id="score-text">Счет: <span id="score">0</span></div>
+        <button id="settings-btn" title="Настройки">
+            <!-- Строгая Иконка шестеренки -->
+            <svg class="ui-svg" viewBox="0 0 24 24">
+                <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .43-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.49-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+            </svg>
+        </button>
+    </header>
+    
+    <canvas id="gameCanvas" width="400" height="400" tabindex="0"></canvas>
+
+    <div id="settings-menu" class="overlay">
+        <h2 id="st-title">Настройки</h2>
+
+        <button id="lang-toggle" class="ui-btn">
+            <span id="st-lang">Язык: Русский</span>
+            <span id="lang-icon" class="svg-icon"></span>
+        </button>
+
+        <button id="theme-toggle" class="ui-btn">
+            <span id="st-theme">Тема: Темная</span>
+            <span id="theme-icon-container"></span>
+        </button>
+
+        <button id="sound-toggle" class="ui-btn">
+            <span id="st-sound">Звук: Вкл</span>
+            <span id="sound-icon-container"></span>
+        </button>
+
+        <button id="close-settings" class="ui-btn primary-btn">Продолжить</button>
+    </div>
+
+    <div id="game-over" class="overlay">
+        <h2 id="go-title">Игра окончена!</h2>
+        <p><span id="go-score-txt">Ваш счет: </span> <span id="final-score">0</span></p>
+        <button id="restart-btn" class="ui-btn primary-btn">Играть снова</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const gridSize = 20;     
+    const tileCount = 20;    
+    
+    const svgFlagRU = `<svg width="24" height="16" viewBox="0 0 24 16"><rect width="24" height="5.33" fill="#ffffff" /><rect y="5.33" width="24" height="5.33" fill="#1C3578" /><rect y="10.66" width="24" height="5.33" fill="#E4181C" /></svg>`;
+    const svgFlagEN = `<svg width="24" height="16" viewBox="0 0 24 16"><rect width="24" height="16" fill="#B22234"/><rect y="2" width="24" height="2" fill="#fff"/><rect y="6" width="24" height="2" fill="#fff"/><rect y="10" width="24" height="2" fill="#fff"/><rect y="14" width="24" height="2" fill="#fff"/><rect width="10" height="9" fill="#3C3B6E"/><circle cx="3" cy="2.5" r="0.8" fill="#fff"/><circle cx="7" cy="2.5" r="0.8" fill="#fff"/><circle cx="5" cy="4.5" r="0.8" fill="#fff"/><circle cx="3" cy="6.5" r="0.8" fill="#fff"/><circle cx="7" cy="6.5" r="0.8" fill="#fff"/></svg>`;
+
+    const uiMoon = `<svg class="ui-svg" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>`;
+    const uiSun = `<svg class="ui-svg" viewBox="0 0 24 24"><path d="M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.79 1.42-1.41zM4 10.5H1v2h3v-2zm9-9.95h-2V3.5h2V.55zm7.45 3.91l-1.41-1.41-1.79 1.79 1.41 1.41 1.79-1.79zm-3.21 13.7l1.79 1.8 1.41-1.41-1.8-1.79-1.4 1.4zM20 10.5v2h3v-2h-3zm-8-5c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm-1 16.95h2V19.5h-2v2.95zm-7.45-3.91l1.41 1.41 1.79-1.8-1.41-1.41-1.79 1.8z"/></svg>`;
+    
+    const uiSoundOn = `<svg class="ui-svg" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>`;
+    const uiSoundOff = `<svg class="ui-svg" viewBox="0 0 24 24"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>`;
+
+    const locales = {
+        ru: {
+            score: "Счет:", settings: "Настройки", close: "Продолжить", gameOverTitle: "Игра окончена!",
+            gameOverScore: "Ваш счет:", restart: "Играть снова", langLabel: "Язык: Русский",
+            flagSvg: svgFlagRU, themeDark: "Тема: Темная", themeLight: "Тема: Светлая",
+            soundOn: "Звук: Вкл", soundOff: "Звук: Выкл"
+        },
+        en: {
+            score: "Score:", settings: "Settings", close: "Resume", gameOverTitle: "Game Over!",
+            gameOverScore: "Final Score:", restart: "Play Again", langLabel: "Lang: English",
+            flagSvg: svgFlagEN, themeDark: "Theme: Dark", themeLight: "Theme: Light",
+            soundOn: "Sound: On", soundOff: "Sound: Off"
+        }
+    };
+
+    let currentLang = 'ru'; 
+    let snake = []; let apple = {};
+    let dx = 0, dy = 0, score = 0, facing = 'RIGHT';
+    let gameLoop, isGameOver = false, isPaused = false, directionChanging = false; 
+
+    let isDarkTheme = true; let soundEnabled = true;
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playSound(type) {
+        if (!soundEnabled) return;
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        if (type === 'eat') {
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(1000, audioCtx.currentTime + 0.08);
+
+            gain.gain.setValueAtTime(0, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.2, audioCtx.currentTime + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            
+            osc.start(audioCtx.currentTime); 
+            osc.stop(audioCtx.currentTime + 0.1);
+        } else if (type === 'die') {
+            osc.frequency.value = 180; osc.type = 'square';
+            gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.35);
+            osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.35);
+        }
+    }
+
+    function startGame() {
+        // Старт: 1 Голова (x:5) и 1 Кубик тела (x:4) (Всего длина = 2)
+        snake = [
+            { x: 5, y: 10 }, 
+            { x: 4, y: 10 }
+        ];
+        score = 0; dx = 0; dy = 0; facing = 'RIGHT';
+        isGameOver = false; directionChanging = false;
+        
+        updateScoreText();
+        document.getElementById("game-over").classList.remove("active");
+        spawnApple();
+        clearInterval(gameLoop);
+        gameLoop = setInterval(update, 130);
+        canvas.focus();
+    }
+
+    function update() {
+        if (isPaused || isGameOver) return;
+        directionChanging = false; 
+        
+        if (dx !== 0 || dy !== 0) {
+            const head = { x: snake[0].x + dx, y: snake[0].y + dy };
+            if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) { gameOver(); return; }
+            for (let i = 0; i < snake.length; i++) { if (head.x === snake[i].x && head.y === snake[i].y) { gameOver(); return; } }
+
+            snake.unshift(head);
+
+            if (head.x === apple.x && head.y === apple.y) {
+                // Счет увеличивается на +1 (вместо +10)
+                score += 1; 
+                updateScoreText();
+                playSound('eat'); 
+                spawnApple();
+            } else {
+                snake.pop(); 
+            }
+        }
+        drawGame();
+    }
+
+    function drawGame() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        const styles = getComputedStyle(document.documentElement);
+        const snakeHeadCol = styles.getPropertyValue('--snake-head').trim();
+        const snakeBodyCol = styles.getPropertyValue('--snake-body').trim();
+
+        // Рисуем Улучшенное Яблоко
+        const ax = apple.x * gridSize + gridSize/2;
+        const ay = apple.y * gridSize + gridSize/2;
+        ctx.fillStyle = '#4CAF50'; 
+        ctx.beginPath(); ctx.ellipse(ax + 3, ay - 8, 4, 2, Math.PI / 4, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#5D4037'; ctx.fillRect(ax - 1, ay - 9, 2, 5);
+        ctx.fillStyle = '#ef5350'; ctx.beginPath(); ctx.arc(ax, ay, gridSize/2 - 2, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#ff8a80'; ctx.beginPath(); ctx.arc(ax - 2, ay - 3, 2, 0, Math.PI*2); ctx.fill();
+
+        // Рисуем Змею
+        for(let i = snake.length - 1; i >= 0; i--) {
+            const px = snake[i].x * gridSize, py = snake[i].y * gridSize;
+            if (i === 0) {
+                ctx.fillStyle = snakeHeadCol;
+                ctx.beginPath();
+                ctx.roundRect ? ctx.roundRect(px + 1, py + 1, gridSize - 2, gridSize - 2, 4) : ctx.fillRect(px+1, py+1, gridSize-2, gridSize-2);
+                ctx.fill();
+                drawSnakeFace(px, py, facing);
+            } else {
+                ctx.fillStyle = snakeBodyCol;
+                ctx.fillRect(px + 1, py + 1, gridSize - 2, gridSize - 2);
+            }
+        }
+    }
+
+    // Декорация Головы
+    function drawSnakeFace(px, py, dir) {
+        let tx = px + gridSize / 2, ty = py + gridSize / 2;
+        let p1x, p1y, p2x, p2y; 
+        let ex1, ey1, ex2, ey2; 
+
+        if (dir === 'RIGHT') {
+            tx = px + 19; ty = py + 10;
+            p1x = tx + 4; p1y = ty - 2; p2x = tx + 4; p2y = ty + 2;
+            ex1 = px + 12; ey1 = py + 5; ex2 = px + 12; ey2 = py + 15;
+        } else if (dir === 'LEFT') {
+            tx = px + 1; ty = py + 10;
+            p1x = tx - 4; p1y = ty - 2; p2x = tx - 4; p2y = ty + 2;
+            ex1 = px + 8; ey1 = py + 5; ex2 = px + 8; ey2 = py + 15;
+        } else if (dir === 'UP') {
+            tx = px + 10; ty = py + 1;
+            p1x = tx - 2; p1y = ty - 4; p2x = tx + 2; p2y = ty - 4;
+            ex1 = px + 5; ey1 = py + 8; ex2 = px + 15; ey2 = py + 8;
+        } else if (dir === 'DOWN') {
+            tx = px + 10; ty = py + 19;
+            p1x = tx - 2; p1y = ty + 4; p2x = tx + 2; p2y = ty + 4;
+            ex1 = px + 5; ey1 = py + 12; ex2 = px + 15; ey2 = py + 12;
+        }
+
+        if (dx !== 0 || dy !== 0 || !isGameOver) { 
+            ctx.strokeStyle = '#ef5350'; ctx.lineWidth = 1.5; ctx.beginPath();
+            ctx.moveTo(tx, ty); 
+            let tEnd = (dir === 'RIGHT') ? tx+2 : (dir === 'LEFT') ? tx-2 : tx;
+            let tEndY = (dir === 'DOWN') ? ty+2 : (dir === 'UP') ? ty-2 : ty;
+            ctx.lineTo(tEnd, tEndY); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(tEnd, tEndY); ctx.lineTo(p1x, p1y); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(tEnd, tEndY); ctx.lineTo(p2x, p2y); ctx.stroke();
+        }
+
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex1, ey1, 2.5, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(ex2, ey2, 2.5, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(ex1, ey1, 1, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(ex2, ey2, 1, 0, Math.PI*2); ctx.fill();
+    }
+
+    function spawnApple() {
+        let isOccupied;
+        do {
+            apple = { x: Math.floor(Math.random() * tileCount), y: Math.floor(Math.random() * tileCount) };
+            isOccupied = snake.some(p => p.x === apple.x && p.y === apple.y);
+        } while (isOccupied);
+    }
+
+    function gameOver() {
+        isGameOver = true; clearInterval(gameLoop);
+        playSound('die');
+        document.getElementById("final-score").innerText = score;
+        document.getElementById("game-over").classList.add("active");
+    }
+
+    document.addEventListener("keydown", (event) => {
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+        if(["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) {
+            event.preventDefault();
+        }
+
+        if (isPaused || isGameOver || directionChanging) return;
+
+        switch(event.key) {
+            case "ArrowLeft": case "A": case "a": case "Ф": case "ф":
+                if (dx !== 1) { dx = -1; dy = 0; facing = 'LEFT'; directionChanging = true; } break;
+            case "ArrowUp": case "W": case "w": case "Ц": case "ц": 
+                if (dy !== 1) { dx = 0; dy = -1; facing = 'UP'; directionChanging = true; } break;
+            case "ArrowRight": case "D": case "d": case "В": case "в": 
+                if (dx !== -1) { dx = 1; dy = 0; facing = 'RIGHT'; directionChanging = true; } break;
+            case "ArrowDown": case "S": case "s": case "Ы": case "ы":
+                if (dy !== -1) { dx = 0; dy = 1; facing = 'DOWN'; directionChanging = true; } break;
+        }
+    });
+
+    function applyLocalization() {
+        const text = locales[currentLang];
+        document.getElementById("score-text").innerHTML = `${text.score} <span id="score">${score}</span>`;
+        document.getElementById("st-title").innerText = text.settings;
+        
+        document.getElementById("st-lang").innerText = text.langLabel;
+        document.getElementById("lang-icon").innerHTML = text.flagSvg;
+        
+        document.getElementById("st-theme").innerText = isDarkTheme ? text.themeDark : text.themeLight;
+        document.getElementById("theme-icon-container").innerHTML = isDarkTheme ? uiMoon : uiSun;
+        
+        document.getElementById("st-sound").innerText = soundEnabled ? text.soundOn : text.soundOff;
+        document.getElementById("sound-icon-container").innerHTML = soundEnabled ? uiSoundOn : uiSoundOff;
+
+        document.getElementById("close-settings").innerText = text.close;
+        document.getElementById("go-title").innerText = text.gameOverTitle;
+        document.getElementById("go-score-txt").innerText = text.gameOverScore;
+        document.getElementById("restart-btn").innerText = text.restart;
+    }
+
+    function updateScoreText() { document.getElementById("score").innerText = score; }
+
+    document.getElementById("lang-toggle").addEventListener("click", () => {
+        currentLang = currentLang === 'ru' ? 'en' : 'ru'; applyLocalization();
+    });
+
+    const settingsMenu = document.getElementById("settings-menu");
+    document.getElementById("settings-btn").addEventListener("click", () => {
+        isPaused = true; settingsMenu.classList.add("active");
+    });
+    document.getElementById("close-settings").addEventListener("click", () => {
+        settingsMenu.classList.remove("active");
+        if (!isGameOver) isPaused = false;
+        canvas.focus();
+    });
+
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        isDarkTheme = !isDarkTheme;
+        if (isDarkTheme) document.body.setAttribute('data-theme', 'dark');
+        else document.body.removeAttribute('data-theme');
+        applyLocalization(); drawGame(); 
+    });
+
+    document.getElementById("sound-toggle").addEventListener("click", () => {
+        soundEnabled = !soundEnabled;
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+        applyLocalization();
+        if(soundEnabled) playSound('eat');
+    });
+
+    document.getElementById("restart-btn").addEventListener("click", startGame);
+
+    applyLocalization();
+    drawGame(); 
+    startGame();
+    
+</script>
+</body>
+</html>
